@@ -58,6 +58,11 @@ FbApp.prototype = {
     var _this = this;
     console.log("Fetching list of users");
 
+    if (typeof path === "function") {
+      callback = path;
+      path = null;
+    }
+
     var options = {
       host: this.graphHost,
       path: path ? path : '/' + this.appId + '/accounts/test-users?' + this.appAccessToken
@@ -71,10 +76,13 @@ FbApp.prototype = {
       });
 
       res.on('end', function() {
-        var data = JSON.parse(result);
+        try {
+          var data = JSON.parse(result);
+        }
+        catch (e) {}
 
-        if (data.error || !data.data) {
-          console.log("Error fetching users", data);
+        if (!data || data.error || !data.data) {
+          console.log("Error fetching users", result);
         } else {
           // Add new users
           if (data.data.length) {
@@ -86,7 +94,7 @@ FbApp.prototype = {
           if (data.paging && data.paging.next && data.data.length >= 50) {
             console.log("Found another page of users");
             var newPath = url.parse(data.paging.next).path;
-            _this.getUserList.apply(_this, newPath);
+            _this.getUserList.apply(_this, [newPath, callback]);
           } else {
             if (callback) {
               callback(_this.testUsers);
