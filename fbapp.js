@@ -22,93 +22,96 @@ function FbApp(config) {
 };
 
 FbApp.prototype = {
-  getAccessToken: function(callback) {
-    var _this = this;
-    this.appAccessToken = "";
-    console.log("Getting access token");
+  /**
+   * Do an API request
+   */
+  doRequest: function(options, callback) {
+    options.host = this.graphHost;
+    options.method = options.method || "GET";
 
-    var options = {
-      host: this.graphHost,
-      path: '/oauth/access_token?client_id=' + this.appId + '&client_secret=' + this.appSecret + '&grant_type=client_credentials'
-    };
+    var result = "";
 
-    https.get(options, function(res) {
-      res.on('data', function(data) {
-        _this.appAccessToken += data;
-      });
-
-      res.on('end', function() {
-        console.log("Access token: " + _this.appAccessToken);
-
-        if (callback) {
-          callback();
-        }
-      });
-
-      res.on('close', function(err) {
-        console.log("Error", err);
-      });
-    })
-    .on('error', function(e) {
-      console.log('Problem with request: ' + e.message);
-    });
-  },
-
-  getUserList: function(path, callback) {
-    var _this = this;
-    console.log("Fetching list of users");
-
-    if (typeof path === "function") {
-      callback = path;
-      path = null;
-    }
-
-    var options = {
-      host: this.graphHost,
-      path: path ? path : '/' + this.appId + '/accounts/test-users?' + this.appAccessToken
-    };
-
-    https.get(options, function(res) {
-      var result = "";
-
+    https.request(options, function(res) {
       res.on('data', function(data) {
         result += data;
       });
 
       res.on('end', function() {
-        try {
-          var data = JSON.parse(result);
-        }
-        catch (e) {}
-
-        if (!data || data.error || !data.data) {
-          console.log("Error fetching users", result);
-        } else {
-          // Add new users
-          if (data.data.length) {
-            _this.testUsers = _this.testUsers.concat(data.data);
-          }
-
-          // Only 50 users at a time, handle more pages
-          // Sometimes it gives next page when there isn't actually one
-          if (data.paging && data.paging.next && data.data.length >= 50) {
-            console.log("Found another page of users");
-            var newPath = url.parse(data.paging.next).path;
-            _this.getUserList.apply(_this, [newPath, callback]);
-          } else {
-            if (callback) {
-              callback(_this.testUsers);
-            }
-          }
+        if (callback) {
+          callback(result);
         }
       });
 
       res.on('close', function(err) {
-        console.log("Error completing request", err);
+        console.log("Connection closed", err);
       });
     })
     .on('error', function(e) {
-      console.log('problem with request: ' + e.message);
+      console.log('Problem with request: ' + e.message);
+    })
+    .end();
+  },
+
+  getAccessToken: function(callback) {
+    this.appAccessToken = "";
+    console.log("Getting access token");
+
+    var options = {
+      path: '/oauth/access_token?client_id=' + this.appId + '&client_secret=' + this.appSecret + '&grant_type=client_credentials'
+    };
+
+    this.doRequest(options, function(result) {
+      this.appAccessToken = result;
+      if (callback) callback(result);
+    });
+  },
+
+  getUserList: function(path, recursive, callback) {
+    var _this = this;
+    console.log("Fetching list of users");
+
+    var pathType = typeof path;
+    if (pathType === "function") {
+      callback = path;
+      path = null;
+      recursive = true;
+    } else if (pathType === "boolean") {
+      callback = recursive;
+      recursive = path;
+      path = null;
+    }
+
+    var options = {
+      path: path ? path : '/' + this.appId + '/accounts/test-users?' + this.appAccessToken
+    };
+
+    this.doRequest(options, function(result) {
+      try {
+        var data = JSON.parse(result);
+      }
+      catch (e) {}
+
+      if (!data || data.error || !data.data) {
+        console.log("Error fetching users", result);
+      } else {
+        // Add new users
+        if (data.data.length) {
+          _this.testUsers = _this.testUsers.concat(data.data);
+        }
+
+        // Only 50 users at a time, handle more pages
+        // Sometimes it gives next page when there isn't actually one
+        if (recursive && data.paging && data.paging.next && data.data.length >= 50) {
+          console.log("Found another page of users");
+          var newPath = url.parse(data.paging.next).path;
+          //this.getUserList.apply(_this, [newPath, callback]);
+          _this.getUserList(newPath, true, callback);
+        } else {
+          if (callback) {
+            callback(_this.testUsers);
+          }
+        }
+      }
     });
   },
 
@@ -119,7 +122,6 @@ FbApp.prototype = {
     num = num || 1;
 
     var options = {
-      host: this.graphHost,
       path: '/' + this.appId + '/accounts/test-users?installed=true&' + this.appAccessToken,
       method: 'POST'
     };
@@ -128,34 +130,20 @@ FbApp.prototype = {
 
     var result = "";
 
-    https.request(options, function(res) {
-      res.on('data', function(data) {
-        result += data;
-      });
+    this.doRequest(options, function(result) {
+      var data = JSON.parse(result);
 
-      res.on('end', function() {
-        var data = JSON.parse(result);
+      if (data.error || !data.id) {
+        console.log("Error creating user", data);
+      } else {
+        console.log("Created new user " + data.id);
+        _this.testUsers.push(data);
 
-        if (data.error || !data.id) {
-          console.log("Error creating user", data);
-        } else {
-          console.log("Created new user " + data.id);
-          _this.testUsers.push(data);
-
-          if (num === 0 && callback) {
-            callback();
-          }
+        if (num === 0 && callback) {
+          callback();
         }
-      });
-
-      res.on('close', function(err) {
-        console.log("Error", err);
-      });
-    })
-    .on('error', function(e) {
-      console.log('Problem with request: ' + e.message);
-    })
-    .end();
+      }
+    });
 
     if (num > 0) {
       _this.createUsers.apply(this, [num, callback]);
@@ -163,74 +151,36 @@ FbApp.prototype = {
   },
 
   deleteUser: function(userId, callback) {
-    console.log("Attempting to delete user " + userId);
-
     var options = {
-      host: this.graphHost,
       path: '/' + userId + '/?method=delete&' + this.appAccessToken,
       method: 'POST'
     };
 
-    var result = "";
+    this.doRequest(options, function(result) {
+      var success = result === "true";
 
-    https.request(options, function(res) {
-      res.on('data', function(data) {
-        result += data;
-      });
+      if (!success && result !== "false") {
+        console.log("Unexpected result", result);
+      }
 
-      res.on('end', function() {
-        var success = result === "true";
-
-        if (success) {
-          console.log("Deleted user " + userId);
-        } else if (result === "false") {
-          console.log("Didn't delete user " + userId);
-        } else {
-          console.log("Unexpected result", result);
-        }
-
-        if (callback) {
-          callback(success);
-        }
-      });
-
-      res.on('close', function(err) {
-        console.log("Error", err);
-      });
-    })
-    .on('error', function(e) {
-      console.log('Problem with request: ' + e.message);
-    })
-    .end();
+      if (callback) {
+        callback(success);
+      }
+    });
   },
 
   // Makes the user authorized to use the app
-  addToApp: function(user) {
+  addToApp: function(user, callback) {
     var options = {
-      host: this.graphHost,
       path: '/' + this.appId + '/accounts/test-users?installed=true&permissions=read_stream&' + this.appAccessToken + "&owner_" + this.appAccessToken + "&uid=" + user.id,
       method: 'POST'
     };
 
-    var result = "";
-
-    https.request(options, function(res) {
-      res.on('data', function(data) {
-        result += data;
-      });
-
-      res.on('end', function() {
-        console.log("addToApp done", result);
-      });
-
-      res.on('close', function(err) {
-        console.log("Error", err);
-      });
-    })
-    .on('error', function(e) {
-      console.log('Problem with request: ' + e.message);
-    })
-    .end();
+    this.doRequest(options, function(result) {
+      if (callback) {
+        callback(result);
+      }
+    });
   },
 
   // Takes the first user and adds the remaining users as its friend
@@ -264,41 +214,20 @@ FbApp.prototype = {
 
   addFriend: function(user, friend, callback) {
     var options = {
-      host: this.graphHost,
       path: '/' + user.id + '/friends/' + friend.id + '?access_token=' + user.access_token,
       method: 'POST'
     };
 
-    var result = "";
+    this.doRequest(options, function(result) {
+      var success = result === "true";
 
-    https.request(options, function(res) {
-      res.on('data', function(data) {
-        result += data;
-      });
-
-      res.on('end', function() {
-        var success = result === "true";
-
-        if (success) {
-          console.log("Added friend " + friend.id + " to " + user.id);
-        } else if (result === "false") {
-          console.log("Didn't add friend " + friend.id);
-        } else {
-          console.log("Unexpected result from adding " + friend.id + " to " + user.id, result);
-        }
-        if (callback) {
-          callback(success);
-        }
-      });
-
-      res.on('close', function(err) {
-        console.log("Error", err);
-      });
-    })
-    .on('error', function(e) {
-      console.log('Problem with request: ' + e.message);
-    })
-    .end();
+      if (!success && result !== "false") {
+        console.log("Unexpected result from adding " + friend.id + " to " + user.id, result);
+      }
+      if (callback) {
+        callback(success);
+      }
+    });
   }
 };
 
