@@ -117,6 +117,7 @@ FbApp.prototype = {
 
   // Recursive function to create many users
   // Executes callback when done
+  // @TODO Callback should be passed an array of the created users.
   createUsers: function(num, callback) {
     var _this = this;
     num = num || 1;
@@ -128,8 +129,6 @@ FbApp.prototype = {
 
     num--;
 
-    var result = "";
-
     this.doRequest(options, function(result) {
       var data = JSON.parse(result);
 
@@ -138,10 +137,10 @@ FbApp.prototype = {
       } else {
         console.log("Created new user " + data.id);
         _this.testUsers.push(data);
+      }
 
-        if (num === 0 && callback) {
-          callback();
-        }
+      if (num === 0 && callback) {
+        callback();
       }
     });
 
