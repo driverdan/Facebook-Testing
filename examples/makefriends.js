@@ -1,7 +1,7 @@
 // Adds friend connections for Facebook test users
 
-var FbApp = require('./FbApp').FbApp;
-var config = require('./config').config;
+var FbApp = require('../fbtesting').FbTesting;
+var config = require('../config').config;
 
 var fbapp = new FbApp(config);
 

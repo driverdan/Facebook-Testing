@@ -1,7 +1,7 @@
 var https = require('https');
 var url = require('url');
 
-function FbApp(config) {
+function FbTesting(config) {
   if (!config) {
     throw new Exception("Configuration required");
   }
@@ -21,7 +21,7 @@ function FbApp(config) {
   this.graphHost = 'graph.facebook.com';
 };
 
-FbApp.prototype = {
+FbTesting.prototype = {
   /**
    * Do an API request
    */
@@ -230,4 +230,4 @@ FbApp.prototype = {
   }
 };
 
-exports.FbApp = FbApp;
+exports.FbTesting = FbTesting;

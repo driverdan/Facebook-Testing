@@ -1,5 +1,5 @@
-FbApp
-=====
+Facebook Testing
+================
 
 FbApp lets you work with Facebook test users. For use see examples and tests.
 
@@ -9,4 +9,4 @@ Copy config.sample.js to config.js and edit values. This file isn't required but
 
 License: MIT
 
-There are bugs and issues. The library name is too broad and may be changed.
+There are bugs. Scope is wrong in a number of places. Don't like it? Fork, fix, pull request. ;)
