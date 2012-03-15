@@ -108,7 +108,7 @@ FbTesting.prototype = {
           _this.getUserList(newPath, true, callback);
         } else {
           if (callback) {
-            callback(_this.testUsers);
+            callback(_this.testUsers, data);
           }
         }
       }
